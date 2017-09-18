@@ -188,7 +188,8 @@ public class ApplicationSettings {
 				prefs.getBoolean("server_alarmnew_" + order, false),
 				prefs.getString("server_alarmexclude_" + order, null),
 				prefs.getString("server_alarminclude_" + order, null),
-				false);
+				false,
+				null);
 		// @formatter:on
 	}
 
@@ -502,7 +503,7 @@ public class ApplicationSettings {
 			edit.putString("rssfeed_exclude_" + i, prefs.getString("rssfeed_exclude_" + (i + 1), null));
 			edit.putString("rssfeed_include_" + i, prefs.getString("rssfeed_include_" + (i + 1), null));
 			edit.putLong("rssfeed_lastviewed_" + i, prefs.getLong("rssfeed_lastviewed_" + (i + 1), -1));
-			edit.putString("rssfeed_lastvieweditemurl_" + i, prefs.getString("rssfeed_lastvieweditemurl_" + (i + 1), null));
+			edit.putLong("rssfeed_lastvieweditemurl_" + i, prefs.getLong("rssfeed_lastvieweditemurl_" + (i + 1), -1));
 		}
 
 		// Remove the last settings, of which we are now sure are no longer required

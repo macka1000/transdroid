@@ -99,10 +99,11 @@ public class XirvikSharedSettingsActivity extends KeyBoundPreferencesActivity {
 					String server = prefs.getString("seedbox_xirvikshared_server_" + key, null);
 					String user = prefs.getString("seedbox_xirvikshared_user_" + key, null);
 					String pass = prefs.getString("seedbox_xirvikshared_pass_" + key, null);
+					String token = prefs.getString("seedbox_xirvikshared_token_" + key, null);
 
 					// Retrieve the RPC mount point setting from the server itself
 					DefaultHttpClient httpclient =
-							HttpHelper.createStandardHttpClient(true, user, pass, true, null, HttpHelper.DEFAULT_CONNECTION_TIMEOUT, server, 443);
+							HttpHelper.createStandardHttpClient(true, user, pass, true, null, HttpHelper.DEFAULT_CONNECTION_TIMEOUT, server, 443, token);
 					String url = "https://" + server + ":443/browsers_addons/transdroid_autoconf.txt";
 					HttpResponse request = httpclient.execute(new HttpGet(url));
 					InputStream stream = request.getEntity().getContent();

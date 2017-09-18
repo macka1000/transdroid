@@ -17,21 +17,35 @@
 package org.transdroid.core.gui.settings;
 
 import android.annotation.TargetApi;
+import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
 import android.content.DialogInterface;
 import android.content.DialogInterface.OnClickListener;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.preference.ListPreference;
 import android.preference.Preference;
 import android.preference.Preference.OnPreferenceClickListener;
+import android.text.TextUtils;
+import android.util.Log;
 
+import com.nispok.snackbar.Snackbar;
+import com.nispok.snackbar.SnackbarManager;
+import com.nispok.snackbar.enums.SnackbarType;
+
+import org.androidannotations.annotations.Background;
 import org.androidannotations.annotations.Bean;
 import org.androidannotations.annotations.EActivity;
+import org.androidannotations.annotations.OnActivityResult;
 import org.androidannotations.annotations.OptionsItem;
+import org.androidannotations.annotations.UiThread;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.DefaultHttpClient;
 import org.transdroid.R;
 import org.transdroid.core.app.search.SearchHelper;
 import org.transdroid.core.app.search.SearchSite;
@@ -41,13 +55,19 @@ import org.transdroid.core.app.settings.ServerSetting;
 import org.transdroid.core.app.settings.WebsearchSetting;
 import org.transdroid.core.gui.TorrentsActivity_;
 import org.transdroid.core.gui.navigation.NavigationHelper;
+import org.transdroid.core.gui.search.BarcodeHelper;
 import org.transdroid.core.gui.settings.RssfeedPreference.OnRssfeedClickedListener;
 import org.transdroid.core.gui.settings.ServerPreference.OnServerClickedListener;
 import org.transdroid.core.gui.settings.WebsearchPreference.OnWebsearchClickedListener;
 import org.transdroid.core.seedbox.SeedboxPreference;
 import org.transdroid.core.seedbox.SeedboxPreference.OnSeedboxClickedListener;
 import org.transdroid.core.seedbox.SeedboxProvider;
+import org.transdroid.core.seedbox.XirvikDediSettings;
+import org.transdroid.core.seedbox.XirvikSemiSettings;
+import org.transdroid.core.seedbox.XirvikSharedSettings;
+import org.transdroid.daemon.util.HttpHelper;
 
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -174,6 +194,14 @@ public class MainSettingsActivity extends PreferenceCompatActivity {
 		// Load the preference menu and attach actions
 		addPreferencesFromResource(R.xml.pref_main);
 		findPreference("header_addserver").setOnPreferenceClickListener(onAddServer);
+		final Activity activity = this;
+		findPreference("header_addserver_qr").setOnPreferenceClickListener(new OnPreferenceClickListener() {
+			@Override
+			public boolean onPreferenceClick(Preference preference) {
+				BarcodeHelper.startBarcodeScanner(activity, BarcodeHelper.ACTIVITY_BARCODE_ADDSERVER);
+				return true;
+			}
+		});
 		if (enableSearchUi) {
 			findPreference("header_addwebsearch").setOnPreferenceClickListener(onAddWebsearch);
 		}
@@ -283,6 +311,16 @@ public class MainSettingsActivity extends PreferenceCompatActivity {
 		super.onBuildHeaders(target);
 	}
 
+	@Background
+	@OnActivityResult(BarcodeHelper.ACTIVITY_BARCODE_ADDSERVER)
+	public void onServerBarcodeScanned(int resultCode, Intent data) {
+		if (data != null) {
+			// We receive from the helper either a URL (as string) or a query we can start a search for
+			String query = BarcodeHelper.handleScanResult(resultCode, data, navigationHelper.enableSearchUi());
+			onServerBarcodeScanHandled(data.getStringExtra("SCAN_RESULT"), query);
+		}
+	}
+
 	@Override
 	protected Dialog onCreateDialog(int id) {
 		switch (id) {
@@ -298,4 +336,61 @@ public class MainSettingsActivity extends PreferenceCompatActivity {
 		return null;
 	}
 
+	@UiThread
+	protected void onServerBarcodeScanHandled(String barcode, String result) {
+		Log.d(getLocalClassName(), "Scanned barcode " + barcode + " and got " + result);
+		if (TextUtils.isEmpty(result)) {
+			SnackbarManager.show(Snackbar.with(this).text("Empty QR code").colorResource(R.color.red).type(SnackbarType.MULTI_LINE));
+		} else {
+			final String qrResult[] = result.split("\n");
+			if(qrResult.length >= 3) {
+				if(qrResult[1].equals("P")) {
+					XirvikDediSettings xirvikDediSettings = new XirvikDediSettings();
+					xirvikDediSettings.saveServerSetting(this, qrResult[0], qrResult[2]);
+					MainSettingsActivity_.intent(this).start();
+				} else if(qrResult[1].equals("N")) {
+					XirvikSemiSettings xirvikSemiSettings = new XirvikSemiSettings();
+					xirvikSemiSettings.saveServerSetting(this, qrResult[0], qrResult[2]);
+					MainSettingsActivity_.intent(this).start();
+				} else if(qrResult[1].equals("RG")) {
+					new AsyncTask<Void, Void, String>() {
+						@Override
+						protected String doInBackground(Void... params) {
+							try {
+								// Retrieve the RPC mount point setting from the server itself
+								DefaultHttpClient httpclient =
+										HttpHelper.createStandardHttpClient(true, "", "", true, null, HttpHelper.DEFAULT_CONNECTION_TIMEOUT, qrResult[0], 443, qrResult[2]);
+								String url = "https://" + qrResult[0] + ":443/browsers_addons/transdroid_autoconf.txt";
+								HttpResponse request = httpclient.execute(new HttpGet(url));
+								InputStream stream = request.getEntity().getContent();
+								String folder = HttpHelper.convertStreamToString(stream).trim();
+								if (folder.startsWith("<?xml")) {
+									folder = null;
+								}
+								stream.close();
+								return folder;
+
+							} catch (Exception e) {
+								Log.d(getLocalClassName(), "Could not retrieve the Xirvik shared seedbox RPC mount point setting: " + e.toString());
+								return null;
+
+							}
+						}
+
+						@Override
+						protected void onPostExecute(String result) {
+							XirvikSharedSettings xirvikSharedSettings = new XirvikSharedSettings();
+							xirvikSharedSettings.saveServerSetting(getApplicationContext(), qrResult[0], qrResult[2], result);
+							MainSettingsActivity_.intent(getApplicationContext()).start();
+						}
+					}.execute();
+
+				} else {
+					SnackbarManager.show(Snackbar.with(this).text("Wrong QR server type").colorResource(R.color.red).type(SnackbarType.MULTI_LINE));
+				}
+			} else {
+				SnackbarManager.show(Snackbar.with(this).text("Not enought qrResult in QR result").colorResource(R.color.red).type(SnackbarType.MULTI_LINE));
+			}
+		}
+	}
 }

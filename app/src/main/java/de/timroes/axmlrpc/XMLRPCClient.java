@@ -1,5 +1,7 @@
 package de.timroes.axmlrpc;
 
+import android.util.Log;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
@@ -7,6 +9,7 @@ import java.net.SocketTimeoutException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.apache.http.Header;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.params.ClientPNames;
@@ -377,9 +380,21 @@ public class XMLRPCClient {
 				StringEntity entity = new StringEntity(c.getXML(), HTTP.UTF_8);
 				entity.setContentType(TYPE_XML);
 				post.setEntity(entity);
-				
+
+				Header[] headers = post.getAllHeaders();
+				for(int i = 0 ; i < headers.length ; i++) {
+					headers.toString();
+					Log.e("AAA", "HEADER [" + headers[i].getName() + "] -> " + headers[i].getValue());
+				}
+
 				HttpResponse response = httpclient.execute(post);
 				int statusCode = response.getStatusLine().getStatusCode();
+
+				/*Header[] headers = response.getAllHeaders();
+				for(int i = 0 ; i < headers.length ; i++) {
+					headers.toString();
+					Log.e("AAA", "HEADER [" + headers[i].getName() + "] -> " + headers[i].getValue());
+				}*/
 				
 				InputStream istream;
 

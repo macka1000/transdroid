@@ -20,10 +20,13 @@ import android.annotation.TargetApi;
 import android.app.SearchManager;
 import android.content.ContentResolver;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
+import android.preference.EditTextPreference;
+import android.preference.PreferenceManager;
 import android.support.annotation.NonNull;
 import android.support.v4.view.MenuItemCompat;
 import android.support.v4.widget.DrawerLayout;
@@ -88,6 +91,9 @@ import org.transdroid.core.gui.search.BarcodeHelper;
 import org.transdroid.core.gui.search.FilePickerHelper;
 import org.transdroid.core.gui.search.UrlEntryDialog;
 import org.transdroid.core.gui.settings.MainSettingsActivity_;
+import org.transdroid.core.seedbox.XirvikDediSettings;
+import org.transdroid.core.seedbox.XirvikSemiSettings;
+import org.transdroid.core.seedbox.XirvikSharedSettings;
 import org.transdroid.core.service.BootReceiver;
 import org.transdroid.core.service.ConnectivityHelper;
 import org.transdroid.core.widget.ListWidgetProvider;
@@ -469,6 +475,7 @@ public class TorrentsActivity extends AppCompatActivity implements TorrentTasksE
 			torrentsToolbar.getMenu().findItem(R.id.action_search).setVisible(false);
 			torrentsToolbar.getMenu().findItem(R.id.action_rss).setVisible(false);
 			torrentsToolbar.getMenu().findItem(R.id.action_settings).setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
+			torrentsToolbar.getMenu().findItem(R.id.action_add_qr_server).setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
 			torrentsToolbar.getMenu().findItem(R.id.action_help).setVisible(true);
 			actionsToolbar.getMenu().findItem(R.id.action_enableturtle).setVisible(false);
 			actionsToolbar.getMenu().findItem(R.id.action_disableturtle).setVisible(false);
@@ -496,6 +503,7 @@ public class TorrentsActivity extends AppCompatActivity implements TorrentTasksE
 		torrentsToolbar.getMenu().findItem(R.id.action_search).setVisible(navigationHelper.enableSearchUi());
 		torrentsToolbar.getMenu().findItem(R.id.action_rss).setVisible(navigationHelper.enableRssUi());
 		torrentsToolbar.getMenu().findItem(R.id.action_settings).setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
+		torrentsToolbar.getMenu().findItem(R.id.action_add_qr_server).setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
 		torrentsToolbar.getMenu().findItem(R.id.action_help).setVisible(false);
 		// Secondary toolbar menu
 		boolean hasAltMode = Daemon.supportsSetAlternativeMode(currentConnection.getType());
@@ -795,16 +803,26 @@ public class TorrentsActivity extends AppCompatActivity implements TorrentTasksE
 
 	@Background
 	@OnActivityResult(BarcodeHelper.ACTIVITY_BARCODE_ADDTORRENT)
-	public void onBarcodeScanned(int resultCode, Intent data) {
+	public void onTorrentBarcodeScanned(int resultCode, Intent data) {
 		if (data != null) {
 			// We receive from the helper either a URL (as string) or a query we can start a search for
 			String query = BarcodeHelper.handleScanResult(resultCode, data, navigationHelper.enableSearchUi());
-			onBarcodeScanHandled(data.getStringExtra("SCAN_RESULT"), query);
+			onTorrentBarcodeScanHandled(data.getStringExtra("SCAN_RESULT"), query);
+		}
+	}
+
+	@Background
+	@OnActivityResult(BarcodeHelper.ACTIVITY_BARCODE_ADDSERVER)
+	public void onServerBarcodeScanned(int resultCode, Intent data) {
+		if (data != null) {
+			// We receive from the helper either a URL (as string) or a query we can start a search for
+			String query = BarcodeHelper.handleScanResult(resultCode, data, navigationHelper.enableSearchUi());
+			onServerBarcodeScanHandled(data.getStringExtra("SCAN_RESULT"), query);
 		}
 	}
 
 	@UiThread
-	protected void onBarcodeScanHandled(String barcode, String result) {
+	protected void onTorrentBarcodeScanHandled(String barcode, String result) {
 		log.d(this, "Scanned barcode " + barcode + " and got " + result);
 		if (TextUtils.isEmpty(result)) {
 			SnackbarManager.show(Snackbar.with(this).text(R.string.error_noproductforcode).colorResource(R.color.red).type(SnackbarType.MULTI_LINE));
@@ -815,6 +833,64 @@ public class TorrentsActivity extends AppCompatActivity implements TorrentTasksE
 			addTorrentByMagnetUrl(result, title);
 		} else if (navigationHelper.enableSearchUi()) {
 			startSearch(result, false, null, false);
+		}
+	}
+
+	@UiThread
+	protected void onServerBarcodeScanHandled(String barcode, String result) {
+		log.d(this, "Scanned barcode " + barcode + " and got " + result);
+		if (TextUtils.isEmpty(result)) {
+			SnackbarManager.show(Snackbar.with(this).text("Empty QR code").colorResource(R.color.red).type(SnackbarType.MULTI_LINE));
+		} else {
+			final String qrResult[] = result.split("\n");
+			if(qrResult.length >= 3) {
+				if(qrResult[1].equals("P")) {
+					XirvikDediSettings xirvikDediSettings = new XirvikDediSettings();
+					xirvikDediSettings.saveServerSetting(this, qrResult[0], qrResult[2]);
+					MainSettingsActivity_.intent(this).start();
+				} else if(qrResult[1].equals("N")) {
+					XirvikSemiSettings xirvikSemiSettings = new XirvikSemiSettings();
+					xirvikSemiSettings.saveServerSetting(this, qrResult[0], qrResult[2]);
+					MainSettingsActivity_.intent(this).start();
+				} else if(qrResult[1].equals("RG")) {
+					new AsyncTask<Void, Void, String>() {
+						@Override
+						protected String doInBackground(Void... params) {
+							try {
+								// Retrieve the RPC mount point setting from the server itself
+								DefaultHttpClient httpclient =
+										HttpHelper.createStandardHttpClient(true, "", "", true, null, HttpHelper.DEFAULT_CONNECTION_TIMEOUT, qrResult[0], 443, qrResult[2]);
+								String url = "https://" + qrResult[0] + ":443/browsers_addons/transdroid_autoconf.txt";
+								HttpResponse request = httpclient.execute(new HttpGet(url));
+								InputStream stream = request.getEntity().getContent();
+								String folder = HttpHelper.convertStreamToString(stream).trim();
+								if (folder.startsWith("<?xml")) {
+									folder = null;
+								}
+								stream.close();
+								return folder;
+
+							} catch (Exception e) {
+								log.d(getClass().getName(), "Could not retrieve the Xirvik shared seedbox RPC mount point setting: " + e.toString());
+								return null;
+
+							}
+						}
+
+						@Override
+						protected void onPostExecute(String result) {
+							XirvikSharedSettings xirvikSharedSettings = new XirvikSharedSettings();
+							xirvikSharedSettings.saveServerSetting(getApplicationContext(), qrResult[0], qrResult[2], result);
+							MainSettingsActivity_.intent(getApplicationContext()).start();
+						}
+					}.execute();
+
+				} else {
+					SnackbarManager.show(Snackbar.with(this).text("Wrong QR server type").colorResource(R.color.red).type(SnackbarType.MULTI_LINE));
+				}
+			} else {
+				SnackbarManager.show(Snackbar.with(this).text("Not enought qrResult in QR result").colorResource(R.color.red).type(SnackbarType.MULTI_LINE));
+			}
 		}
 	}
 
@@ -840,6 +916,11 @@ public class TorrentsActivity extends AppCompatActivity implements TorrentTasksE
 	@OptionsItem(R.id.action_rss)
 	protected void openRss() {
 		RssfeedsActivity_.intent(this).start();
+	}
+
+	@OptionsItem(R.id.action_add_qr_server)
+	protected void addQRServer() {
+		BarcodeHelper.startBarcodeScanner(this, BarcodeHelper.ACTIVITY_BARCODE_ADDSERVER);
 	}
 
 	@OptionsItem(R.id.action_settings)
@@ -1103,7 +1184,7 @@ public class TorrentsActivity extends AppCompatActivity implements TorrentTasksE
 
 		try {
 			// Cookies are taken from the websearchSetting that we already matched against this target URL
-			DefaultHttpClient httpclient = HttpHelper.createStandardHttpClient(false, null, null, true, null, 10000, null, -1);
+			DefaultHttpClient httpclient = HttpHelper.createStandardHttpClient(false, null, null, true, null, 10000, null, -1, null);
 			Map<String, String> cookies = HttpHelper.parseCookiePairs(websearchSetting.getCookies());
 			String domain = Uri.parse(url).getHost();
 			for (Entry<String, String> pair : cookies.entrySet()) {

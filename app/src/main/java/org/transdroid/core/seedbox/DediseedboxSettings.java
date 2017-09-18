@@ -73,7 +73,8 @@ public class DediseedboxSettings extends SeedboxSettingsImpl implements SeedboxS
 				prefs.getBoolean("seedbox_dediseedbox_alarmnew_" + order, false),
 				prefs.getString("seedbox_dediseedbox_alarmexclude_" + order, null),
 				prefs.getString("seedbox_dediseedbox_alarminclude_" + order, null),
-				true);
+				true,
+				null);
 		// @formatter:on
 	}
 

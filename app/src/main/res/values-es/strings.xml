@@ -159,7 +159,7 @@
   <string name="widget_usedarktheme">Usar tema oscuro (sin vista previa)</string>
   <string name="widget_done">HECHO</string>
   <string name="pref_servers">Servidores</string>
-  <string name="pref_addserver">Añadir nuevo servidor</string>
+  <string name="pref_addserver">Añadir nuevo servidor manualmente</string>
   <string name="pref_addseedbox">Agregar seedbox</string>
   <string name="pref_searchsites">Sitios de búsqueda</string>
   <string name="pref_setsearchsite">Establecer sitio predeterminado</string>

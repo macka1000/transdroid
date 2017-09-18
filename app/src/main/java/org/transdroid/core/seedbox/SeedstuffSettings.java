@@ -73,7 +73,8 @@ public class SeedstuffSettings extends SeedboxSettingsImpl implements SeedboxSet
 				prefs.getBoolean("seedbox_seedstuff_alarmnew_" + order, false),
 				prefs.getString("seedbox_seedstuff_alarmexclude_" + order, null),
 				prefs.getString("seedbox_seedstuff_alarminclude_" + order, null),
-				true);
+				true,
+				null);
 		// @formatter:on
 	}
 

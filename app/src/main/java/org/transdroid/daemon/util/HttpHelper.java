@@ -18,6 +18,7 @@
 package org.transdroid.daemon.util;
 
 import android.net.Uri;
+import android.util.Log;
 
 import org.apache.http.Header;
 import org.apache.http.HeaderElement;
@@ -67,6 +68,7 @@ public class HttpHelper {
 	 * The 'User-Agent' name to send to the server
 	 */
 	public static String userAgent = "Transdroid Torrent Connect";
+
 	/**
 	 * HTTP request interceptor to allow for GZip-encoded data transfer
 	 */
@@ -77,6 +79,7 @@ public class HttpHelper {
 			}
 		}
 	};
+
 	/**
 	 * HTTP response interceptor that decodes GZipped data
 	 */
@@ -109,7 +112,7 @@ public class HttpHelper {
 			throws DaemonException {
 		return createStandardHttpClient(userBasicAuth && settings.shouldUseAuthentication(), settings.getUsername(),
 				settings.getPassword(), settings.getSslTrustAll(), settings.getSslTrustKey(),
-				settings.getTimeoutInMilliseconds(), settings.getAddress(), settings.getPort());
+				settings.getTimeoutInMilliseconds(), settings.getAddress(), settings.getPort(), settings.getAuthToken());
 	}
 
 	/**
@@ -125,7 +128,7 @@ public class HttpHelper {
 	 */
 	public static DefaultHttpClient createStandardHttpClient(boolean userBasicAuth, String username, String password,
 															 boolean sslTrustAll, String sslTrustKey, int timeout,
-															 String authAddress, int authPort) throws DaemonException {
+															 String authAddress, int authPort, final String authToken) throws DaemonException {
 
 		// Register http and https sockets
 		SchemeRegistry registry = new SchemeRegistry();
@@ -142,6 +145,7 @@ public class HttpHelper {
 
 		// Standard parameters
 		HttpParams httpparams = new BasicHttpParams();
+
 		HttpConnectionParams.setConnectionTimeout(httpparams, timeout);
 		HttpConnectionParams.setSoTimeout(httpparams, timeout);
 		if (userAgent != null) {
@@ -160,6 +164,16 @@ public class HttpHelper {
 			httpclient.getCredentialsProvider()
 					.setCredentials(new AuthScope(authAddress, authPort, AuthScope.ANY_REALM),
 							new UsernamePasswordCredentials(username, password));
+		}
+
+		// Auth token header
+		if(authToken != null) {
+			httpclient.addRequestInterceptor(new HttpRequestInterceptor() {
+				@Override
+				public void process(HttpRequest httpRequest, HttpContext httpContext) throws HttpException, IOException {
+					httpRequest.addHeader("X-QR-Auth", authToken);
+				}
+			});
 		}
 
 		return httpclient;

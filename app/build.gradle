@@ -19,11 +19,11 @@ android {
     }
     productFlavors {
         full {
-            applicationId 'org.transdroid.full'
+            applicationId 'org.transdroid.xirvik.full'
             resValue "string", "search_history_authority", applicationId + ".search.SearchHistoryProvider"
         }
         lite {
-            applicationId 'org.transdroid.lite'
+            applicationId 'org.transdroid.xirvik.lite'
             resValue "string", "search_history_authority", applicationId + ".search.SearchHistoryProvider"
         }
     }

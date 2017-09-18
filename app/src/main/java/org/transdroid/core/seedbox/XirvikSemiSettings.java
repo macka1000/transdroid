@@ -23,6 +23,8 @@ import org.transdroid.daemon.OS;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.preference.PreferenceManager;
+import android.util.Log;
 
 /**
  * Implementation of {@link SeedboxSettings} for a Xirvik semi-dedicated seedbox.
@@ -30,6 +32,8 @@ import android.content.SharedPreferences;
  */
 public class XirvikSemiSettings extends SeedboxSettingsImpl implements SeedboxSettings {
 
+	public static final String TAG = "XirvikSemiSettings";
+	
 	@Override
 	public String getName() {
 		return "Xirvik semi-dedi";
@@ -44,6 +48,7 @@ public class XirvikSemiSettings extends SeedboxSettingsImpl implements SeedboxSe
 		}
 		String user = prefs.getString("seedbox_xirviksemi_user_" + order, null);
 		String pass = prefs.getString("seedbox_xirviksemi_pass_" + order, null);
+		String authToken = prefs.getString("seedbox_xirviksemi_token_" + order, null);
 		return new ServerSetting(
 				orderOffset + order,
 				prefs.getString("seedbox_xirviksemi_name_" + order, null), 
@@ -70,7 +75,8 @@ public class XirvikSemiSettings extends SeedboxSettingsImpl implements SeedboxSe
 				prefs.getBoolean("seedbox_xirviksemi_alarmnew_" + order, false),
 				prefs.getString("seedbox_xirviksemi_alarmexclude_" + order, null),
 				prefs.getString("seedbox_xirviksemi_alarminclude_" + order, null),
-				true);
+				true,
+				authToken);
 		// @formatter:on
 	}
 
@@ -87,7 +93,34 @@ public class XirvikSemiSettings extends SeedboxSettingsImpl implements SeedboxSe
 	@Override
 	public void removeServerSetting(SharedPreferences prefs, int order) {
 		removeServerSetting(prefs, "seedbox_xirviksemi_server_", new String[] { "seedbox_xirviksemi_name_",
-				"seedbox_xirviksemi_server_", "seedbox_xirviksemi_user_", "seedbox_xirviksemi_pass_" }, order);
+				"seedbox_xirviksemi_server_", "seedbox_xirviksemi_user_", "seedbox_xirviksemi_pass_", "seedbox_xirviksemi_token_" }, order);
 	}
 
+	public void saveServerSetting(Context context, String server, String token) {
+		// Get server order
+		int key = SeedboxProvider.XirvikSemi.getSettings().getMaxSeedboxOrder(PreferenceManager.getDefaultSharedPreferences(context)) + 1;
+
+		// Shared preferences
+		SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
+
+		// Check server already exists to replace token
+		for(int i = 0 ; i <= SeedboxProvider.XirvikSemi.getSettings().getMaxSeedboxOrder(PreferenceManager.getDefaultSharedPreferences(context)) ; i++) {
+			Log.e(TAG, prefs.getString("seedbox_xirviksemi_server_" + i, ""));
+			if(prefs.getString("seedbox_xirviksemi_server_" + i, "").equals(server)) {
+				Log.d(TAG, "Server found, updating token!");
+				key = i;
+			}
+		}
+
+		// Preferences Editor
+		SharedPreferences.Editor prefsEditor = prefs.edit();
+		prefsEditor.putString("seedbox_xirviksemi_client_" + key, Daemon.toCode(Daemon.rTorrent));
+		prefsEditor.putString("seedbox_xirviksemi_name" + key, "QR Server " + key);
+		prefsEditor.putString("seedbox_xirviksemi_server_" + key, server);
+		prefsEditor.putString("seedbox_xirviksemi_user_" + key, "");
+		prefsEditor.putString("seedbox_xirviksemi_pass_" + key, "");
+		prefsEditor.putString("seedbox_xirviksemi_token_" + key, token);
+		prefsEditor.commit();
+
+	}
 }

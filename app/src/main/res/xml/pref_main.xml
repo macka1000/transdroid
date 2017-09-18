@@ -25,21 +25,25 @@
 			android:key="header_addserver"
 			android:title="@string/pref_addserver"
 			android:order="98" />
+		<Preference
+			android:key="header_addserver_qr"
+			android:title="@string/pref_addserver_qr"
+			android:order="99" />
 		<ListPreference
 			android:key="header_defaultserver"
 			android:title="@string/pref_defaultserver"
-			android:order="99"
+			android:order="10"
 			android:defaultValue="-2" />
 	</PreferenceCategory>
 	
 	<PreferenceCategory
 		android:key="header_searchsites"
 		android:title="@string/pref_searchsites"
-		android:order="100">
+		android:order="101">
 		<ListPreference
 			android:key="header_setsearchsite"
 			android:title="@string/pref_setsearchsite"
-			android:order="101" />
+			android:order="102" />
 		<Preference
 			android:key="header_addwebsearch"
 			android:title="@string/pref_addwebsearch" 

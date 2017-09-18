@@ -16,6 +16,8 @@
  */
 package org.transdroid.core.seedbox;
 
+import org.androidannotations.annotations.Bean;
+import org.transdroid.core.app.settings.ApplicationSettings;
 import org.transdroid.core.app.settings.ServerSetting;
 import org.transdroid.daemon.Daemon;
 import org.transdroid.daemon.OS;
@@ -23,12 +25,16 @@ import org.transdroid.daemon.OS;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.preference.PreferenceManager;
+import android.util.Log;
 
 /**
  * Implementation of {@link SeedboxSettings} for the Xirvik dedicated seedbox.
  * @author Eric Kok
  */
 public class XirvikDediSettings extends SeedboxSettingsImpl implements SeedboxSettings {
+
+	public static final String TAG = "XirvikDediSettings";
 
 	@Override
 	public String getName() {
@@ -45,6 +51,7 @@ public class XirvikDediSettings extends SeedboxSettingsImpl implements SeedboxSe
 		Daemon type = Daemon.fromCode(prefs.getString("seedbox_xirvikdedi_client_" + order, null));
 		String user = prefs.getString("seedbox_xirvikdedi_user_" + order, null);
 		String pass = prefs.getString("seedbox_xirvikdedi_pass_" + order, null);
+		String authToken = prefs.getString("seedbox_xirvikdedi_token_" + order, null);
 		return new ServerSetting(
 				orderOffset + order,
 				prefs.getString("seedbox_xirvikdedi_name_" + order, null), 
@@ -54,7 +61,7 @@ public class XirvikDediSettings extends SeedboxSettingsImpl implements SeedboxSe
 				0,
 				null,
 				type == Daemon.uTorrent? 5010: 443, 
-				type == Daemon.uTorrent? false: true, 
+				type == Daemon.uTorrent? false: true,
 				false,
 				null,
 				type == Daemon.Deluge? "/deluge": null,
@@ -71,7 +78,8 @@ public class XirvikDediSettings extends SeedboxSettingsImpl implements SeedboxSe
 				prefs.getBoolean("seedbox_xirvikdedi_alarmnew_" + order, false),
 				prefs.getString("seedbox_xirvikdedi_alarmexclude_" + order, null),
 				prefs.getString("seedbox_xirvikdedi_alarminclude_" + order, null),
-				true);
+				true,
+				authToken);
 		// @formatter:on
 	}
 
@@ -89,7 +97,35 @@ public class XirvikDediSettings extends SeedboxSettingsImpl implements SeedboxSe
 	public void removeServerSetting(SharedPreferences prefs, int order) {
 		removeServerSetting(prefs, "seedbox_xirvikdedi_server_", new String[] { "seedbox_xirvikdedi_name_",
 				"seedbox_xirvikdedi_server_", "seedbox_xirvikdedi_client_", "seedbox_xirvikdedi_user_",
-				"seedbox_xirvikdedi_pass_" }, order);
+				"seedbox_xirvikdedi_pass_", "seedbox_xirvikdedi_token_" }, order);
+	}
+
+	public void saveServerSetting(Context context, String server, String token) {
+		// Get server order
+		int key = SeedboxProvider.XirvikDedi.getSettings().getMaxSeedboxOrder(PreferenceManager.getDefaultSharedPreferences(context)) + 1;
+
+		// Shared preferences
+		SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
+
+		// Check server already exists to replace token
+		for(int i = 0 ; i <= SeedboxProvider.XirvikDedi.getSettings().getMaxSeedboxOrder(PreferenceManager.getDefaultSharedPreferences(context)) ; i++) {
+			Log.e(TAG, prefs.getString("seedbox_xirvikdedi_server_" + i, ""));
+			if(prefs.getString("seedbox_xirvikdedi_server_" + i, "").equals(server)) {
+				Log.d(TAG, "Server found, updating token!");
+				key = i;
+			}
+		}
+
+		// Preferences Editor
+		SharedPreferences.Editor prefsEditor = prefs.edit();
+		prefsEditor.putString("seedbox_xirvikdedi_client_" + key, Daemon.toCode(Daemon.rTorrent));
+		prefsEditor.putString("seedbox_xirvikdedi_name" + key, "QR Server " + key);
+		prefsEditor.putString("seedbox_xirvikdedi_server_" + key, server);
+		prefsEditor.putString("seedbox_xirvikdedi_user_" + key, "");
+		prefsEditor.putString("seedbox_xirvikdedi_pass_" + key, "");
+		prefsEditor.putString("seedbox_xirvikdedi_token_" + key, token);
+		prefsEditor.commit();
+
 	}
 
 }
